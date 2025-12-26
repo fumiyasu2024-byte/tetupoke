@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>ポケモン使用率データベース</title>
+<style>
+body { font-family:"Segoe UI", sans-serif; background:#f4f6fa; margin:0; }
+header { background:#222; color:white; padding:12px; text-align:center; font-size:20px; }
+.controls { display:flex; justify-content:center; gap:10px; padding:10px; flex-wrap:wrap;}
+input, select, button { padding:6px 10px; font-size:14px; }
+.grid { display:grid; grid-template-columns: repeat(5, 1fr); gap:10px; padding:10px; }
+.card { background:white; border-radius:8px; padding:10px; border:1px solid #ddd; cursor:pointer; transition:0.2s; text-align:center; }
+.card:hover { background:#eef3ff; transform:scale(1.03); }
+.rank { font-weight:bold; color:#1e40af; font-size:18px; }
+#detail { position:fixed; inset:0; background:rgba(0,0,0,0.6); display:none; align-items:center; justify-content:center; }
+#detailBox { background:white; padding:20px; width:300px; border-radius:10px; }
+#close { float:right; cursor:pointer; }
+</style>
+</head>
+<body>
+
+<header>ポケモン使用率ランキング</header>
+
+<div class="controls">
+  <button onclick="showSeason(1)">Season 1</button>
+  <button onclick="showSeason(2)">Season 2</button>
+  <input id="search" placeholder="ポケモン検索" oninput="render()">
+  <button onclick="randomTeam()">ランダム6体</button>
+</div>
+
+<div id="list" class="grid"></div>
+
+<div id="detail">
+  <div id="detailBox">
+    <div id="close" onclick="closeDetail()">✖</div>
+    <h3 id="d-name"></h3>
+    <p><b>持ち物ランキング</b></p>
+    <p>1位：<span id="i1"></span></p>
+    <p>2位：<span id="i2"></span></p>
+    <p>3位：<span id="i3"></span></p>
+  </div>
+</div>
+
+<script>
+// ------------------ データ ------------------
+const season1 = [
+{rank:1,name:"カプ・レヒレ",items:["とつげきチョッキ","こだわりスカーフ","こだわりメガネ"]},
+{rank:2,name:"ランドロス",items:["ゴツゴツメット","とつげきチョッキ","こだわりスカーフ"]},
+{rank:3,name:"ヒコパンダ",items:["ゴツゴツメット","きあいのタスキ","とつげきチョッキ"]},
+{rank:4,name:"ウーラオス",items:["こだわりハチマキ","いのちのたま","ラムのみ"]},
+{rank:5,name:"バテリオン",items:["きあいのたすき","こだわりメガネ","とつげきチョッキ"]},
+{rank:6,name:"イカリグマ",items:["とつげきチョッキ","だっしゅつパック","きあいのたすき"]},
+{rank:7,name:"デッカパンダ",items:["クリアチャーム","オボンのみ","こだわりハチマキ"]},
+{rank:8,name:"ワライグマ",items:["こだわりスカーフ","こだわりハチマキ","しずくのプレート"]},
+{rank:9,name:"タチモサス",items:["とつげきチョッキ","たべのこし","オボンのみ"]},
+{rank:10,name:"ハバタクカミ",items:["ブーストエナジー","こだわりメガネ","きあいのタスキ"]},
+
+{rank:11,name:"ガルーラ",items:["ガルーラナイト","ノーマルジュエル","ゴツゴツメット"]},
+{rank:12,name:"カプ・テテフ",items:["こだわりメガネ","きあいのタスキ","いのちのたま"]},
+{rank:13,name:"タコッチ",items:["たべのこし","オボンのみ","ゴツゴツメット"]},
+{rank:14,name:"タケルライコ",items:["ゴツゴツメット","こだわりメガネ","とつげきチョッキ"]},
+{rank:15,name:"ステゴール",items:["たべのこし","オボンのみ","レッドカード"]},
+{rank:16,name:"ヘイラッシャ",items:["たべのこし","オボンのみ","ゴツゴツメット"]},
+{rank:17,name:"オオニューラ",items:["サイコシード","ノーマルジュエル","きあいの襷"]},
+{rank:18,name:"トカゲオン",items:["きあいのたすき","トカゲオンナイト","シルクのスカーフ"]},
+{rank:19,name:"ナットレイ",items:["たべのこし","ゴツゴツメット","ラムのみ"]},
+{rank:20,name:"オシャベリー",items:["ゴツゴツメット","たべのこし","オボンのみ"]},
+
+{rank:21,name:"ゲンガー",items:["ゲンガーナイト","きあいのたすき","こだわりメガネ"]},
+{rank:22,name:"ケミカライト",items:["たべのこし","オボンのみ","ラムのみ"]},
+{rank:23,name:"テッカグヤ",items:["たべのこし","ゴツゴツメット","オボンのみ"]},
+{rank:24,name:"パオジアン",items:["きあいのタスキ","いのちのたま","こだわりスカーフ"]},
+{rank:25,name:"ペンダント",items:["たべのこし","オボンのみ","とつげきチョッキ"]},
+
+{rank:26,name:"ディンルー",items:["たべのこし","ゴツゴツメット","オボンのみ"]},
+{rank:27,name:"イーユイ",items:["こだわりメガネ","きあいのタスキ","いのちのたま"]},
+{rank:28,name:"火パンダ",items:["たべのこし","オボンのみ","とつげきチョッキ"]},
+{rank:29,name:"タルウェーブ",items:["たべのこし","オボンのみ","ゴツゴツメット"]},
+{rank:30,name:"ブリジュラス",items:["たべのこし","ゴツゴツメット","オボンのみ"]},
+
+{rank:31,name:"グランドラス",items:["たべのこし","オボンのみ","ラムのみ"]},
+{rank:32,name:"カプ・コケコ",items:["こだわりメガネ","きあいのタスキ","いのちのたま"]},
+{rank:33,name:"ニジジャク",items:["たべのこし","ゴツゴツメット","オボンのみ"]},
+{rank:34,name:"ウーラオス悪",items:["こだわりハチマキ","いのちのたま","ラムのみ"]},
+{rank:35,name:"タケパンダ",items:["たべのこし","オボンのみ","とつげきチョッキ"]},
+
+{rank:36,name:"エアームド",items:["ゴツゴツメット","たべのこし","オボンのみ"]},
+{rank:37,name:"ウバーザン",items:["たべのこし","オボンのみ","ラムのみ"]},
+{rank:38,name:"テツノツツミ",items:["ブーストエナジー","きあいのタスキ","いのちのたま"]},
+{rank:39,name:"テツノブジン",items:["ブーストエナジー","きあいのタスキ","いのちのたま"]},
+{rank:40,name:"オーガポン火",items:["おめん","たべのこし","とつげきチョッキ"]},
+
+{rank:41,name:"ウネルミナモ",items:["たべのこし","オボンのみ","ラムのみ"]},
+{rank:42,name:"シャトホワイト",items:["たべのこし","オボンのみ","ゴツゴツメット"]},
+{rank:43,name:"グラディウス",items:["たべのこし","オボンのみ","ラムのみ"]},
+{rank:44,name:"ウラヌルス",items:["たべのこし","オボンのみ","ラムのみ"]},
+{rank:45,name:"ママンボウ",items:["たべのこし","ゴツゴツメット","オボンのみ"]},
+
+{rank:46,name:"クレセリア",items:["たべのこし","ゴツゴツメット","オボンのみ"]},
+{rank:47,name:"トザセイシ",items:["たべのこし","オボンのみ","ラムのみ"]},
+{rank:48,name:"レスキング",items:["たべのこし","ゴツゴツメット","オボンのみ"]},
+{rank:49,name:"サンダー",items:["ブーツ","ゴツゴツメット","オボンのみ"]},
+{rank:50,name:"サーフゴー",items:["こだわりメガネ","たべのこし","オボンのみ"]},
+
+{rank:51,name:"水パンダ",items:["たべのこし","オボンのみ","とつげきチョッキ"]},
+{rank:52,name:"ガチグマA",items:["たべのこし","ゴツゴツメット","オボンのみ"]},
+{rank:53,name:"ダーパンダ",items:["たべのこし","オボンのみ","とつげきチョッキ"]},
+{rank:54,name:"トドロクツキ",items:["ブーストエナジー","いのちのたま","こだわりハチマキ"]},
+{rank:55,name:"オーガポン岩",items:["おめん","たべのこし","とつげきチョッキ"]},
+
+{rank:56,name:"ジュモクモク",items:["たべのこし","ゴツゴツメット","オボンのみ"]},
+{rank:57,name:"ライトベアン",items:["たべのこし","オボンのみ","ラムのみ"]},
+{rank:58,name:"グソクムシャ",items:["たべのこし","オボンのみ","ゴツゴツメット"]},
+{rank:59,name:"マイルカ",items:["きあいのタスキ","いのちのたま","オボンのみ"]},
+{rank:60,name:"ボルトロス",items:["いのちのたま","こだわりメガネ","オボンのみ"]},
+
+{rank:61,name:"マッチェリー",items:["たべのこし","オボンのみ","ラムのみ"]},
+{rank:62,name:"ラティオス",items:["こだわりメガネ","いのちのたま","オボンのみ"]},
+{rank:63,name:"フレラキャツ",items:["たべのこし","オボンのみ","ラムのみ"]},
+{rank:64,name:"ダイキング",items:["たべのこし","ゴツゴツメット","オボンのみ"]},
+{rank:65,name:"レジエレキ",items:["きあいのタスキ","こだわりメガネ","いのちのたま"]},
+
+{rank:66,name:"ヒョウパンダ",items:["たべのこし","オボンのみ","とつげきチョッキ"]},
+{rank:67,name:"カイリュー",items:["じゃくてんほけん","たべのこし","ラムのみ"]},
+{rank:68,name:"キアイチュウ",items:["きあいのタスキ","いのちのたま","オボンのみ"]},
+{rank:69,name:"オーガポン水",items:["おめん","たべのこし","とつげきチョッキ"]},
+{rank:70,name:"ファンカイキ",items:["たべのこし","オボンのみ","ラムのみ"]},
+
+{rank:71,name:"ゲッコウガ",items:["きあいのタスキ","いのちのたま","こだわりメガネ"]},
+{rank:72,name:"コノヨザル",items:["こだわりハチマキ","たべのこし","オボンのみ"]},
+{rank:73,name:"クチート",items:["たべのこし","オボンのみ","ゴツゴツメット"]},
+{rank:74,name:"ハカドック岩",items:["たべのこし","ゴツゴツメット","オボンのみ"]},
+{rank:75,name:"エスパンダ",items:["たべのこし","オボンのみ","ラムのみ"]},
+
+{rank:76,name:"ガチグマ原",items:["たべのこし","ゴツゴツメット","オボンのみ"]},
+{rank:77,name:"オウゴンオニ",items:["たべのこし","オボンのみ","ラムのみ"]},
+{rank:78,name:"ウガツホムラ",items:["ブーストエナジー","いのちのたま","こだわりハチマキ"]},
+{rank:79,name:"トゲキッス",items:["こだわりメガネ","たべのこし","オボンのみ"]},
+{rank:80,name:"ロトム水",items:["たべのこし","オボンのみ","ゴツゴツメット"]},
+
+{rank:81,name:"ウオノラゴン",items:["こだわりスカーフ","いのちのたま","ラムのみ"]},
+{rank:82,name:"カプ・ブルル",items:["たべのこし","オボンのみ","ゴツゴツメット"]},
+{rank:83,name:"ヒードラン",items:["たべのこし","オボンのみ","ゴツゴツメット"]},
+{rank:84,name:"アーマーガア",items:["ゴツゴツメット","たべのこし","オボンのみ"]},
+{rank:85,name:"ドオー",items:["たべのこし","オボンのみ","ゴツゴツメット"]},
+
+{rank:86,name:"テツノワダチ",items:["ブーストエナジー","いのちのたま","こだわりハチマキ"]},
+{rank:87,name:"プラズマイン",items:["たべのこし","オボンのみ","ラムのみ"]},
+{rank:88,name:"ホンダンボウ",items:["たべのこし","オボンのみ","ゴツゴツメット"]},
+{rank:89,name:"テラマジャン",items:["たべのこし","オボンのみ","ラムのみ"]},
+{rank:90,name:"キラフロル",items:["きあいのタスキ","いのちのたま","オボンのみ"]},
+
+{rank:91,name:"フェローチェ",items:["きあいのタスキ","いのちのたま","ラムのみ"]},
+{rank:92,name:"ブロザビット",items:["たべのこし","オボンのみ","ゴツゴツメット"]},
+{rank:93,name:"モウタク",items:["たべのこし","オボンのみ","ラムのみ"]},
+{rank:94,name:"アブソル",items:["いのちのたま","きあいのタスキ","オボンのみ"]},
+{rank:95,name:"ランタビエ",items:["たべのこし","オボンのみ","ラムのみ"]},
+
+{rank:96,name:"コイノボリュウ",items:["たべのこし","オボンのみ","ゴツゴツメット"]},
+{rank:97,name:"シャッチール",items:["たべのこし","オボンのみ","ラムのみ"]},
+{rank:98,name:"ナラクジラ",items:["たべのこし","オボンのみ","ゴツゴツメット"]},
+{rank:99,name:"テツノカシラ",items:["ブーストエナジー","いのちのたま","こだわりハチマキ"]},
+{rank:100,name:"イダイトウ",items:["たべのこし","オボンのみ","ゴツゴツメット"]},
+
+{rank:101,name:"テツノイワオ",items:["ブーストエナジー","いのちのたま","こだわりハチマキ"]},
+{rank:102,name:"ボルケーヴ",items:["たべのこし","オボンのみ","ラムのみ"]},
+{rank:103,name:"ラティアス",items:["こだわりメガネ","たべのこし","オボンのみ"]},
+{rank:104,name:"ロトム火",items:["たべのこし","オボンのみ","ゴツゴツメット"]},
+{rank:105,name:"リザードン",items:["ブーツ","いのちのたま","こだわりメガネ"]},
+
+{rank:106,name:"ミミッキュ",items:["きあいのタスキ","いのちのたま","ラムのみ"]},
+{rank:107,name:"ゴルゼイブズ",items:["たべのこし","オボンのみ","ゴツゴツメット"]},
+{rank:108,name:"グライオン",items:["どくどくだま","たべのこし","オボンのみ"]},
+{rank:109,name:"テツノドクガ",items:["ブーストエナジー","いのちのたま","こだわりメガネ"]},
+{rank:110,name:"ダイケッショウ",items:["たべのこし","オボンのみ","ゴツゴツメット"]},
+
+{rank:111,name:"グレートサウス",items:["たべのこし","オボンのみ","ラムのみ"]},
+{rank:112,name:"カミツルギ",items:["こだわりスカーフ","いのちのたま","きあいのタスキ"]},
+{rank:113,name:"ドシャグズリ",items:["たべのこし","オボンのみ","ゴツゴツメット"]},
+{rank:114,name:"ブリザース",items:["たべのこし","オボンのみ","ラムのみ"]},
+{rank:115,name:"ギンピラー",items:["たべのこし","オボンのみ","ゴツゴツメット"]},
+
+{rank:116,name:"ギャラドス",items:["いのちのたま","たべのこし","ラムのみ"]},
+{rank:117,name:"カバルドン",items:["たべのこし","ゴツゴツメット","オボンのみ"]},
+{rank:118,name:"ドラパルト",items:["こだわりスカーフ","いのちのたま","きあいのタスキ"]},
+{rank:119,name:"オーロンゲ",items:["ひかりのねんど","たべのこし","オボンのみ"]},
+{rank:120,name:"テツノイサハ",items:["ブーストエナジー","いのちのたま","こだわりハチマキ"]},
+
+{rank:121,name:"エンパンダ",items:["たべのこし","オボンのみ","とつげきチョッキ"]},
+{rank:122,name:"ハクバドス",items:["たべのこし","オボンのみ","ゴツゴツメット"]},
+{rank:123,name:"ダイカンバツ",items:["たべのこし","オボンのみ","ラムのみ"]},
+{rank:124,name:"メガフラワー",items:["たべのこし","オボンのみ","ゴツゴツメット"]},
+{rank:125,name:"ハガパンダ",items:["たべのこし","オボンのみ","とつげきチョッキ"]},
+
+{rank:126,name:"パッチラゴン",items:["こだわりスカーフ","いのちのたま","ラムのみ"]},
+{rank:127,name:"レイスポス",items:["たべのこし","オボンのみ","ゴツゴツメット"]},
+{rank:128,name:"ザピドス",items:["こだわりメガネ","いのちのたま","オボンのみ"]},
+{rank:129,name:"ギルガルド",items:["たべのこし","いのちのたま","ゴツゴツメット"]},
+{rank:130,name:"キノガッサ",items:["きあいのタスキ","いのちのたま","オボンのみ"]},
+
+{rank:131,name:"マフォクシー",items:["たべのこし","オボンのみ","ゴツゴツメット"]},
+{rank:132,name:"ホルード",items:["たべのこし","オボンのみ","ラムのみ"]},
+{rank:133,name:"カンフー",items:["たべのこし","オボンのみ","とつげきチョッキ"]},
+{rank:134,name:"アシレーヌ",items:["こだわりメガネ","たべのこし","オボンのみ"]},
+{rank:135,name:"クリムオン",items:["たべのこし","オボンのみ","ラムのみ"]},
+
+{rank:136,name:"ケケンカニ",items:["たべのこし","オボンのみ","ゴツゴツメット"]},
+{rank:137,name:"テラキオン",items:["こだわりスカーフ","いのちのたま","ラムのみ"]},
+{rank:138,name:"ウツロイド",items:["きあいのタスキ","いのちのたま","こだわりメガネ"]},
+{rank:139,name:"チオンジェン",items:["たべのこし","ゴツゴツメット","オボンのみ"]},
+{rank:140,name:"オガラドン",items:["たべのこし","オボンのみ","ラムのみ"]},
+
+{rank:141,name:"ハリーケン",items:["たべのこし","オボンのみ","ゴツゴツメット"]},
+{rank:142,name:"ガブリアス",items:["いのちのたま","こだわりスカーフ","ゴツゴツメット"]},
+{rank:143,name:"テツノカイナ",items:["ブーストエナジー","いのちのたま","こだわりハチマキ"]},
+{rank:144,name:"レジドラゴ",items:["たべのこし","オボンのみ","ゴツゴツメット"]},
+{rank:145,name:"メタグロス",items:["たべのこし","こだわりハチマキ","オボンのみ"]},
+
+{rank:146,name:"アラブルタケ",items:["たべのこし","オボンのみ","ゴツゴツメット"]},
+{rank:147,name:"フレステゴ",items:["たべのこし","オボンのみ","ラムのみ"]},
+{rank:148,name:"トドッカク",items:["たべのこし","オボンのみ","ゴツゴツメット"]},
+{rank:149,name:"ドドゲザン",items:["たべのこし","オボンのみ","ゴツゴツメット"]},
+{rank:150,name:"ヤドラン",items:["たべのこし","オボンのみ","ゴツゴツメット"]}
+  // ←ここに150位まで足せる
+];
+
+const season2 = [
+  {rank:1,name:"ヒコパンダ"},
+  {rank:2,name:"ランドロス"},
+  {rank:3,name:"ウーラオス水"},
+  {rank:4,name:"カプ・レヒレ"},
+  {rank:5,name:"ヘイラッシャ"},
+  {rank:6,name:"バドレックス黒馬"},
+  {rank:7,name:"ハバタクカミ"},
+  {rank:8,name:"アルセウス"},
+  {rank:9,name:"デッカパンダ"},
+  {rank:10,name:"ガルーラ"},
+  {rank:11,name:"ディンルー"},
+  {rank:12,name:"バテリオン"},
+  {rank:13,name:"レックウザ"},
+  {rank:14,name:"ドラゴール"},
+  {rank:15,name:"カプ・テテフ"},
+  {rank:16,name:"グラードン"},
+  {rank:17,name:"オオニューラ"},
+  {rank:18,name:"タチモサス"},
+  {rank:19,name:"ジンベール"},
+  {rank:20,name:"ステゴール"},
+  {rank:21,name:"パオジアン"},
+  {rank:22,name:"タコッチ"},
+  {rank:23,name:"オーロンゲ"},
+  {rank:24,name:"ブリジュラス"},
+  {rank:25,name:"タケルライコ"},
+  {rank:26,name:"ゼルネアス"},
+  {rank:27,name:"ファンタルス"},
+  {rank:28,name:"バドレックス白馬"},
+  {rank:29,name:"コライドン"},
+  {rank:30,name:"イカリグマ"},
+  {rank:31,name:"イベルタル"},
+  {rank:32,name:"ジガルデ"},
+  {rank:33,name:"カイオーガ"},
+  {rank:34,name:"神パンダ"},
+  {rank:35,name:"平和熊猫"},
+  {rank:36,name:"カジーキー"},
+  {rank:37,name:"トカゲオン"},
+  {rank:38,name:"ホウオウ"},
+  {rank:39,name:"ミライドン"},
+  {rank:40,name:"モードロウ"},
+  {rank:41,name:"ワライグマ"},
+  {rank:42,name:"ナットレイ"},
+  {rank:43,name:"オシャベリー"},
+  {rank:44,name:"ルナアーラ"},
+  {rank:45,name:"メジアゴン"},
+  {rank:46,name:"ダイウチュウ"},
+  {rank:47,name:"ガチラルス"},
+  {rank:48,name:"ゲンガー"},
+  {rank:49,name:"ザシアン"},
+  {rank:50,name:"ムゲンダイナ"},
+  {rank:51,name:"テッカグヤ"},
+  {rank:52,name:"日食ネクロズマ"},
+  {rank:53,name:"ザマゼンタ"},
+  {rank:54,name:"ペンダント"},
+  {rank:55,name:"イーユイ"},
+  {rank:56,name:"火パンダ"},
+  {rank:57,name:"タルウェーブ"},
+  {rank:58,name:"グランドラス"},
+  {rank:59,name:"カプ・コケコ"},
+  {rank:60,name:"ニジジャク"},
+  {rank:61,name:"ウーラオス悪"},
+  {rank:62,name:"タケパンダ"},
+  {rank:63,name:"エアームド"},
+  {rank:64,name:"ウバーザン"},
+  {rank:65,name:"テツノツツミ"},
+  {rank:66,name:"テツノブジン"},
+  {rank:67,name:"オーガポン火"},
+  {rank:68,name:"ウネルミナモ"},
+  {rank:69,name:"シャトホワイト"},
+  {rank:70,name:"グラディウス"},
+  {rank:71,name:"ウラヌルス"},
+  {rank:72,name:"ママンボウ"},
+  {rank:73,name:"クレセリア"},
+  {rank:74,name:"トザセイシ"},
+  {rank:75,name:"レスキング"},
+  {rank:76,name:"サンダー"},
+  {rank:77,name:"サーフゴー"},
+  {rank:78,name:"水パンダ"},
+  {rank:79,name:"ガチグマA"},
+  {rank:80,name:"ダーパンダ"},
+  {rank:81,name:"トドロクツキ"},
+  {rank:82,name:"オーガポン岩"},
+  {rank:83,name:"ジュモクモク"},
+  {rank:84,name:"ライトベアン"},
+  {rank:85,name:"グソクムシャ"},
+  {rank:86,name:"マイルカ"},
+  {rank:87,name:"ボルトロス"},
+  {rank:88,name:"マッチェリー"},
+  {rank:89,name:"ラティオス"},
+  {rank:90,name:"フレラキャツ"},
+  {rank:91,name:"ダイキング"},
+  {rank:92,name:"レジエレキ"},
+  {rank:93,name:"ヒョウパンダ"},
+  {rank:94,name:"カイリュー"},
+  {rank:95,name:"キアイチュウ"},
+  {rank:96,name:"オーガポン水"},
+  {rank:97,name:"ファンカイキ"},
+  {rank:98,name:"レッサルドン"},
+  {rank:99,name:"ゲッコウガ"},
+  {rank:100,name:"テラパゴス"},
+  {rank:101,name:"コノヨザル"},
+  {rank:102,name:"クチート"},
+  {rank:103,name:"ハカドック岩"},
+  {rank:104,name:"エスパンダ"},
+  {rank:105,name:"ガチグマ原"},
+  {rank:106,name:"オウゴンオニ"},
+  {rank:107,name:"ウガツホムラ"},
+  {rank:108,name:"トゲキッス"},
+  {rank:109,name:"ケミカライト"},
+  {rank:110,name:"ロトム水"},
+  {rank:111,name:"ウオノラゴン"},
+  {rank:112,name:"カプ・ブルル"},
+  {rank:113,name:"ヒードラン"},
+  {rank:114,name:"アーマーガア"},
+  {rank:115,name:"ドオー"},
+  {rank:116,name:"テツノワダチ"},
+  {rank:117,name:"プラズマイン"},
+  {rank:118,name:"ホンダンボウ"},
+  {rank:119,name:"テラマジャン"},
+  {rank:120,name:"キラフロル"},
+  {rank:121,name:"フェローチェ"},
+  {rank:122,name:"ブロザビット"},
+  {rank:123,name:"モウタク"},
+  {rank:124,name:"アブソル"},
+  {rank:125,name:"ランタビエ"},
+  {rank:126,name:"コイノボリュウ"},
+  {rank:127,name:"シャッチール"},
+  {rank:128,name:"ナラクジラ"},
+  {rank:129,name:"テツノカシラ"},
+  {rank:130,name:"イダイトウ"},
+  {rank:131,name:"テツノイワオ"},
+  {rank:132,name:"ボルケーヴ"},
+  {rank:133,name:"ラティアス"},
+  {rank:134,name:"ロトム火"},
+  {rank:135,name:"リザードン"},
+  {rank:136,name:"ミミッキュ"},
+  {rank:137,name:"ゴルゼイブズ"},
+  {rank:138,name:"グライオン"},
+  {rank:139,name:"テツノドクガ"},
+  {rank:140,name:"ダイケッショウ"},
+  {rank:141,name:"グレートサウス"},
+  {rank:142,name:"カミツルギ"},
+  {rank:143,name:"ドシャグズリ"},
+  {rank:144,name:"ブリザース"},
+  {rank:145,name:"ギンピラー"},
+  {rank:146,name:"ギャラドス"},
+  {rank:147,name:"カバルドン"},
+  {rank:148,name:"ドラパルト"},
+  {rank:149,name:"テツノイサハ"},
+  {rank:150,name:"エンパンダ"}
+  // ここも150体までOK
+];
+
+let currentSeason = season1;
+
+// --- 描画関数 ---
+function render() {
+  const q = document.getElementById("search").value;
+  const list = document.getElementById("list");
+  list.innerHTML = "";
+  currentSeason.filter(p=>p.name.includes(q)).forEach(p=>{
+    const d = document.createElement("div");
+    d.className = "card";
+    d.innerHTML = `<div class="rank">${p.rank}</div><div>${p.name}</div>`;
+    d.onclick = ()=>showDetail(p);
+    list.appendChild(d);
+  });
+}
+
+// --- 詳細表示 ---
+function showDetail(p){
+  document.getElementById("d-name").innerText = p.name;
+  document.getElementById("i1").innerText = p.items[0] || "-";
+  document.getElementById("i2").innerText = p.items[1] || "-";
+  document.getElementById("i3").innerText = p.items[2] || "-";
+  document.getElementById("detail").style.display = "flex";
+}
+function closeDetail(){ document.getElementById("detail").style.display = "none"; }
+
+// --- Season切替 ---
+function showSeason(num){
+  if(num===1) currentSeason = season1;
+  else currentSeason = season2;
+  render();
+}
+
+// --- 重み付きランダム6体 ---
+function randomTeam(){
+  const pool=[];
+  currentSeason.forEach(p=>{
+    const weight = Math.pow(151 - p.rank, 2); // 高順位ほど強く
+    for(let i=0;i<weight;i++) pool.push(p);
+  });
+
+  const team=[];
+  const used = new Set();
+  while(team.length<6 && pool.length>0){
+    const p = pool[Math.floor(Math.random()*pool.length)];
+    if(!used.has(p.name)){
+      used.add(p.name);
+      team.push(p);
+    }
+  }
+
+  alert("ランダムチーム：\n" + team.map(t=>`${t.rank}位 ${t.name}`).join("\n"));
+}
+
+render();
+</script>
+</body>
+</html>
